@@ -1,0 +1,108 @@
+2025-07-22 12:10:57,093 - MiniKafka - INFO - MiniKafka broker started on 127.0.0.1:9092
+2025-07-22 12:10:57,093 - MiniKafka - INFO - Data directory: minikafka_data
+2025-07-22 12:10:57,093 - MiniKafka - INFO - Broker ID: 0
+2025-07-22 12:11:28,195 - MiniKafka - INFO - Client f5ffe9f2-128c-4baf-8f4e-b5503c3b122d connected from ('127.0.0.1', 57120)
+2025-07-22 12:11:28,198 - MiniKafka - INFO - Created topic 'test' with 1 partitions
+2025-07-22 12:11:28,199 - MiniKafka - INFO - Client f5ffe9f2-128c-4baf-8f4e-b5503c3b122d disconnected
+2025-07-22 12:11:40,119 - MiniKafka - INFO - Client dee08702-c2a2-4c63-a64a-7b844bb1f64f connected from ('127.0.0.1', 57122)
+2025-07-22 12:11:40,120 - MiniKafka - INFO - Client dee08702-c2a2-4c63-a64a-7b844bb1f64f disconnected
+2025-07-22 12:12:05,295 - MiniKafka - INFO - Client 9ac3537e-22f0-4f1b-b894-25bdda24a8b7 connected from ('127.0.0.1', 57126)
+2025-07-22 12:12:05,297 - MiniKafka - INFO - Client 9ac3537e-22f0-4f1b-b894-25bdda24a8b7 disconnected
+2025-07-22 12:13:43,086 - MiniKafka - INFO - Client ebe4f262-5b19-4212-93b2-28c230995304 connected from ('127.0.0.1', 57136)
+2025-07-22 12:13:43,088 - MiniKafka - INFO - Client ebe4f262-5b19-4212-93b2-28c230995304 disconnected
+2025-07-22 12:14:01,259 - MiniKafka - INFO - Client 95c5bfcf-9347-40d4-9203-0171057b1a2d connected from ('127.0.0.1', 57139)
+2025-07-22 12:14:01,262 - MiniKafka - INFO - Client 95c5bfcf-9347-40d4-9203-0171057b1a2d disconnected
+2025-07-22 12:19:10,178 - MiniKafka - INFO - Client 38cad379-d1c5-4186-9590-dc0e030ca29e connected from ('127.0.0.1', 57180)
+2025-07-22 12:19:10,227 - MiniKafka - INFO - Created topic 'tehhhst' with 1 partitions
+2025-07-22 12:19:10,229 - MiniKafka - INFO - Client 38cad379-d1c5-4186-9590-dc0e030ca29e disconnected
+2025-07-22 12:42:05,801 - MiniKafka - INFO - Client 5de590ac-4744-4cc0-a5be-4d94f4fa1af6 connected from ('127.0.0.1', 57413)
+2025-07-22 12:43:55,891 - MiniKafka - INFO - Client 5de590ac-4744-4cc0-a5be-4d94f4fa1af6 disconnected
+2025-07-22 12:44:02,759 - MiniKafka - INFO - Client 1da9d20d-2d1a-4869-bb2a-d725a7e02376 connected from ('127.0.0.1', 57437)
+2025-07-22 12:45:13,460 - MiniKafka - INFO - Client 1da9d20d-2d1a-4869-bb2a-d725a7e02376 disconnected
+2025-07-22 12:45:15,915 - MiniKafka - INFO - Client 85d64857-0e82-4f37-9a2c-89f65c98b53f connected from ('127.0.0.1', 57446)
+2025-07-22 12:45:15,916 - MiniKafka - ERROR - Invalid JSON from 85d64857-0e82-4f37-9a2c-89f65c98b53f: Expecting value: line 1 column 1 (char 0)
+2025-07-22 12:45:15,916 - MiniKafka - ERROR - Invalid JSON from 85d64857-0e82-4f37-9a2c-89f65c98b53f: Expecting value: line 1 column 1 (char 0)
+2025-07-22 12:45:15,916 - MiniKafka - ERROR - Invalid JSON from 85d64857-0e82-4f37-9a2c-89f65c98b53f: Expecting value: line 1 column 1 (char 0)
+2025-07-22 12:45:15,916 - MiniKafka - ERROR - Failed to send response: [Errno 54] Connection reset by peer
+2025-07-22 12:45:15,917 - MiniKafka - ERROR - Client 85d64857-0e82-4f37-9a2c-89f65c98b53f error: [Errno 54] Connection reset by peer
+2025-07-22 12:53:35,360 - MiniKafka - INFO - Client 4653b178-147e-448e-bcfd-a4bba55ce19f connected from ('127.0.0.1', 57530)
+2025-07-22 12:57:26,966 - MiniKafka - INFO - Client 821d2b28-801f-4564-8060-700bcc97e2ec connected from ('127.0.0.1', 57575)
+2025-07-22 12:57:35,384 - MiniKafka - INFO - Client 4653b178-147e-448e-bcfd-a4bba55ce19f disconnected
+2025-07-22 12:58:56,975 - MiniKafka - INFO - Client 821d2b28-801f-4564-8060-700bcc97e2ec disconnected
+2025-07-22 17:27:57,863 - MiniKafka - INFO - Client 559bed13-25b6-49ce-9bf6-473b11e5df70 connected from ('127.0.0.1', 58916)
+2025-07-22 17:27:57,864 - MiniKafka - INFO - Client 37afefc3-6314-4096-b298-9cb32cd82633 connected from ('127.0.0.1', 58917)
+2025-07-22 17:27:57,874 - MiniKafka - INFO - Client 37afefc3-6314-4096-b298-9cb32cd82633 disconnected
+2025-07-22 17:27:57,874 - MiniKafka - INFO - Created topic 'test-topic' with 1 partitions
+2025-07-22 17:27:57,876 - MiniKafka - INFO - Client 559bed13-25b6-49ce-9bf6-473b11e5df70 disconnected
+2025-07-22 17:28:27,229 - MiniKafka - INFO - Client c2e4c563-f979-4a1d-aaf0-b6a7e93a83dc connected from ('127.0.0.1', 58969)
+2025-07-22 17:29:06,441 - MiniKafka - INFO - Client 79fd0e27-8cd6-41a3-b8f3-b33c0080a544 connected from ('127.0.0.1', 59132)
+2025-07-22 17:29:27,236 - MiniKafka - INFO - Client c2e4c563-f979-4a1d-aaf0-b6a7e93a83dc disconnected
+2025-07-22 17:31:22,269 - MiniKafka - INFO - Client 79fd0e27-8cd6-41a3-b8f3-b33c0080a544 disconnected
+2025-07-22 17:37:07,433 - MiniKafka - INFO - Client fb642547-e19b-4c5b-9d70-9017d5c0cd55 connected from ('127.0.0.1', 61164)
+2025-07-22 17:39:13,876 - MiniKafka - INFO - Client 492672af-6608-43e5-95e3-92077e1aeef6 connected from ('127.0.0.1', 61691)
+2025-07-22 17:39:13,877 - MiniKafka - INFO - Client 492672af-6608-43e5-95e3-92077e1aeef6 disconnected
+2025-07-22 17:39:24,212 - MiniKafka - INFO - Client a9706dfd-53ab-4deb-9deb-97245a9f7cf7 connected from ('127.0.0.1', 61746)
+2025-07-22 17:39:24,218 - MiniKafka - INFO - Created topic 'mytopic' with 1 partitions
+2025-07-22 17:39:24,218 - MiniKafka - INFO - Client a9706dfd-53ab-4deb-9deb-97245a9f7cf7 disconnected
+2025-07-22 17:42:03,476 - MiniKafka - INFO - Client e7d9e58d-66b8-4ce1-83f6-4ddc24c124c3 connected from ('127.0.0.1', 62423)
+2025-07-22 17:43:04,976 - MiniKafka - INFO - Client 9ea10fa4-d6e9-4ec5-94ed-1401730202c7 connected from ('127.0.0.1', 62685)
+2025-07-22 17:43:04,979 - MiniKafka - INFO - Client 9ea10fa4-d6e9-4ec5-94ed-1401730202c7 disconnected
+2025-07-22 17:47:19,284 - MiniKafka - INFO - Client e7d9e58d-66b8-4ce1-83f6-4ddc24c124c3 disconnected
+2025-07-22 17:47:19,286 - MiniKafka - INFO - Client fb642547-e19b-4c5b-9d70-9017d5c0cd55 disconnected
+2025-07-22 18:01:06,800 - MiniKafka - INFO - Client 38e39be4-02af-4617-a129-e483ddc33b78 connected from ('127.0.0.1', 50886)
+2025-07-22 18:04:54,445 - MiniKafka - INFO - Client 38e39be4-02af-4617-a129-e483ddc33b78 disconnected
+2025-07-22 18:07:58,734 - MiniKafka - INFO - Client 9a8857b0-a25b-438e-9c33-2c827113a225 connected from ('127.0.0.1', 52704)
+2025-07-22 18:07:58,736 - MiniKafka - INFO - Client 9a8857b0-a25b-438e-9c33-2c827113a225 disconnected
+2025-07-22 18:09:06,361 - MiniKafka - INFO - Client aed087f3-bc81-4d93-b987-d85b069635b9 connected from ('127.0.0.1', 52888)
+2025-07-22 18:09:06,363 - MiniKafka - INFO - Client aed087f3-bc81-4d93-b987-d85b069635b9 disconnected
+2025-07-22 18:09:08,665 - MiniKafka - INFO - Client f70f54df-a29a-4911-b384-d8604ec93320 connected from ('127.0.0.1', 52901)
+2025-07-22 18:09:08,665 - MiniKafka - INFO - Client f70f54df-a29a-4911-b384-d8604ec93320 disconnected
+2025-07-22 18:09:12,078 - MiniKafka - INFO - Client 1fa0714e-2d4a-41d9-afb7-f9569ef231b3 connected from ('127.0.0.1', 52918)
+2025-07-22 18:09:12,078 - MiniKafka - INFO - Client 1fa0714e-2d4a-41d9-afb7-f9569ef231b3 disconnected
+2025-07-22 18:11:27,262 - MiniKafka - INFO - Client 2d7819cf-d311-4038-a423-61242d5c1399 connected from ('127.0.0.1', 53475)
+2025-07-22 18:11:27,263 - MiniKafka - INFO - Client 2d7819cf-d311-4038-a423-61242d5c1399 disconnected
+2025-07-22 18:14:27,696 - MiniKafka - INFO - Client 610cdec6-8d67-4877-9c8a-9587ceb611bf connected from ('127.0.0.1', 54208)
+2025-07-22 18:14:27,698 - MiniKafka - INFO - Client 610cdec6-8d67-4877-9c8a-9587ceb611bf disconnected
+2025-07-22 18:17:03,828 - MiniKafka - INFO - Client 2ce3c33c-f42b-4a6d-a827-798aafdf934e connected from ('127.0.0.1', 54842)
+2025-07-22 18:19:03,780 - MiniKafka - INFO - Client 2ce3c33c-f42b-4a6d-a827-798aafdf934e disconnected
+2025-07-22 18:20:24,682 - MiniKafka - INFO - Client 96e82e33-3898-4dde-8e02-ea930158f5e2 connected from ('127.0.0.1', 55669)
+2025-07-22 18:23:18,701 - MiniKafka - INFO - Client 96e82e33-3898-4dde-8e02-ea930158f5e2 disconnected
+2025-07-22 18:23:32,569 - MiniKafka - INFO - Client 03e5b922-4600-42df-87bd-209f31501696 connected from ('127.0.0.1', 56432)
+2025-07-22 18:23:37,572 - MiniKafka - INFO - Client 03e5b922-4600-42df-87bd-209f31501696 disconnected
+2025-07-22 18:23:55,221 - MiniKafka - INFO - Received shutdown signal
+2025-07-22 18:23:55,222 - MiniKafka - INFO - Shutting down MiniKafka broker...
+2025-07-22 18:23:55,222 - MiniKafka - INFO - Broker shutdown complete
+2025-07-22 18:24:52,079 - MiniKafka - INFO - MiniKafka broker started on 127.0.0.1:9092
+2025-07-22 18:24:52,079 - MiniKafka - INFO - Data directory: minikafka_data
+2025-07-22 18:24:52,079 - MiniKafka - INFO - Broker ID: 0
+2025-07-22 18:24:52,081 - MiniKafka - INFO - Loaded 4 topics from disk
+2025-07-22 18:25:18,234 - MiniKafka - INFO - Client d0c81860-287f-470d-a478-c07e9ef14f47 connected from ('127.0.0.1', 56865)
+2025-07-22 18:25:23,236 - MiniKafka - INFO - Client d0c81860-287f-470d-a478-c07e9ef14f47 disconnected
+2025-07-22 18:26:05,548 - MiniKafka - INFO - Client 90659db7-50f7-40b2-a67f-b62053bd0b88 connected from ('127.0.0.1', 57059)
+2025-07-22 18:26:10,551 - MiniKafka - INFO - Client 90659db7-50f7-40b2-a67f-b62053bd0b88 disconnected
+2025-07-22 18:26:10,558 - MiniKafka - INFO - Client da93a653-1c47-467b-bcd2-3b2214d7bd69 connected from ('127.0.0.1', 57088)
+2025-07-22 18:26:15,558 - MiniKafka - INFO - Client da93a653-1c47-467b-bcd2-3b2214d7bd69 disconnected
+2025-07-22 18:26:15,561 - MiniKafka - INFO - Client f0c1edc9-e84f-4265-a11f-49e0a6d9860e connected from ('127.0.0.1', 57109)
+2025-07-22 18:26:20,562 - MiniKafka - INFO - Client f0c1edc9-e84f-4265-a11f-49e0a6d9860e disconnected
+2025-07-22 18:26:56,118 - MiniKafka - INFO - Client 41e775e0-ad6d-4a2e-b695-7dab38870083 connected from ('127.0.0.1', 57278)
+2025-07-22 18:27:01,120 - MiniKafka - INFO - Client 41e775e0-ad6d-4a2e-b695-7dab38870083 disconnected
+2025-07-22 18:29:43,847 - MiniKafka - INFO - Client 1e963ee2-7cbb-40a5-bbf5-a68bb03883c6 connected from ('127.0.0.1', 57954)
+2025-07-22 18:29:43,849 - MiniKafka - INFO - Client 1e963ee2-7cbb-40a5-bbf5-a68bb03883c6 disconnected
+2025-07-22 18:31:28,109 - MiniKafka - INFO - Client 61b72f67-8fc7-45fa-9f3e-46fc0d5810f2 connected from ('127.0.0.1', 58378)
+2025-07-22 18:31:28,115 - MiniKafka - INFO - Created topic 'my_test_topic' with 1 partitions
+2025-07-22 18:31:28,116 - MiniKafka - INFO - Client 61b72f67-8fc7-45fa-9f3e-46fc0d5810f2 disconnected
+2025-07-22 18:31:47,059 - MiniKafka - INFO - Client 21fea689-edd6-4b82-b04a-1666068cc592 connected from ('127.0.0.1', 58458)
+2025-07-22 18:31:47,061 - MiniKafka - INFO - Client 21fea689-edd6-4b82-b04a-1666068cc592 disconnected
+2025-07-22 18:31:56,367 - MiniKafka - INFO - Client b6d43115-22fe-426b-a7b3-d5df7673337c connected from ('127.0.0.1', 58496)
+2025-07-22 18:31:56,368 - MiniKafka - INFO - Client b6d43115-22fe-426b-a7b3-d5df7673337c disconnected
+2025-07-22 18:34:43,781 - MiniKafka - INFO - Client 697bb6bc-64fe-4760-8f0a-e76473846501 connected from ('127.0.0.1', 59179)
+2025-07-26 01:40:11,183 - MiniKafka - INFO - Client 697bb6bc-64fe-4760-8f0a-e76473846501 disconnected
+2025-07-26 01:40:16,390 - MiniKafka - INFO - Received shutdown signal
+2025-07-26 01:40:16,391 - MiniKafka - INFO - Shutting down MiniKafka broker...
+2025-07-26 01:40:16,391 - MiniKafka - INFO - Broker shutdown complete
+2025-07-26 01:41:33,926 - MiniKafka - INFO - Received shutdown signal
+2025-07-26 01:41:33,930 - MiniKafka - INFO - Shutting down MiniKafka broker...
+2025-07-26 01:41:33,930 - MiniKafka - INFO - Broker shutdown complete
+2025-07-29 22:29:48,848 - MiniKafka - INFO - Received shutdown signal
+2025-07-29 22:29:48,855 - MiniKafka - INFO - Shutting down MiniKafka broker...
+2025-07-29 22:29:48,855 - MiniKafka - INFO - Broker shutdown complete

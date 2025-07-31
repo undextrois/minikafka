@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniKafka Web Client</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>MiniKafka Web Client</h1>
+        
+        <div class="broker-config">
+            <h2>Broker Connection</h2>
+            <div class="form-group">
+                <label for="broker-url">Broker URL:</label>
+                <input type="text" id="broker-url" value="ws://localhost:9092">
+                <button id="connect-btn">Connect</button>
+                <span id="connection-status" class="status-disconnected">Disconnected</span>
+            </div>
+        </div>
+
+        <div class="topics-section">
+            <h2>Topics</h2>
+            <div class="form-group">
+                <label for="new-topic">Create Topic:</label>
+                <input type="text" id="new-topic" placeholder="topic-name">
+                <input type="number" id="partitions" placeholder="partitions" value="1" min="1">
+                <button id="create-topic-btn">Create</button>
+            </div>
+            <div class="topic-list">
+                <h3>Existing Topics</h3>
+                <ul id="topics-list"></ul>
+            </div>
+        </div>
+
+        <div class="produce-section">
+            <h2>Produce Messages</h2>
+            <div class="form-group">
+                <label for="produce-topic">Topic:</label>
+                <select id="produce-topic"></select>
+                <label for="message-key">Key (optional):</label>
+                <input type="text" id="message-key">
+            </div>
+            <div class="form-group">
+                <label for="message-value">Value:</label>
+                <textarea id="message-value" rows="3"></textarea>
+            </div>
+            <button id="produce-btn">Produce Message</button>
+            <div id="produce-result"></div>
+        </div>
+
+        <div class="consume-section">
+            <h2>Consume Messages</h2>
+            <div class="form-group">
+                <label for="consume-topic">Topic:</label>
+                <select id="consume-topic"></select>
+                <label for="partition">Partition:</label>
+                <input type="number" id="partition" value="0" min="0">
+                <label for="offset">Offset:</label>
+                <input type="number" id="offset" value="0" min="0">
+                <button id="consume-btn">Consume</button>
+                <button id="subscribe-btn">Subscribe</button>
+            </div>
+            <div class="messages-container">
+                <h3>Messages</h3>
+                <div id="messages-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

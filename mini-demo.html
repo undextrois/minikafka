@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniKafka Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        #messages {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 500px;
+            height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>MiniKafka Demo</h1>
+    <button id="create-topic-btn">Create Topic</button>
+    <button id="produce-message-btn">Produce Message</button>
+    <button id="consume-messages-btn">Consume Messages</button>
+    <div id="messages"></div>
+
+    <script>
+        const createTopicBtn = document.getElementById('create-topic-btn');
+        const produceMessageBtn = document.getElementById('produce-message-btn');
+        const consumeMessagesBtn = document.getElementById('consume-messages-btn');
+        const messagesDiv = document.getElementById('messages');
+
+        const topicName = 'test-topic';
+        const proxyUrl = 'http://localhost:3000';
+
+        createTopicBtn.addEventListener('click', createTopic);
+        produceMessageBtn.addEventListener('click', produceMessage);
+        consumeMessagesBtn.addEventListener('click', consumeMessages);
+
+        function createTopic() 
+        {
+            fetch(proxyUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'create_topic', topic: topicName }),
+            })
+            .then(response => {
+                console.log('Response received:', response);
+            if (response.ok) {
+                return response.text();
+            } else {
+                throw new Error(`Error ${response.status}: ${response.statusText}`);
+            }
+            })
+        .then(data => {
+            if (data) {
+                console.log('Data received:', data);
+            } else {
+                console.log('No data received');
+            }
+        })
+        .catch(error => console.error('Error occurred:', error));
+        }
+
+        function produceMessage() {
+            fetch(proxyUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'produce', topic: topicName, value: 'Hello, MiniKafka!' }),
+            })
+            .then(response => response.text())
+            .then(data => console.log(data))
+            .catch(error => console.error(error));
+        }
+
+        function consumeMessages() {
+            fetch(proxyUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'consume', topic: topicName }),
+            })
+            .then(response => response.text())
+            .then(data => {
+                const response = JSON.parse(data);
+                const messagesHtml = response.messages.map((message) => {
+                    return `<p>Offset: ${message.offset}, Value: ${message.value}</p>`;
+                }).join('');
+                messagesDiv.innerHTML = messagesHtml;
+            })
+            .catch(error => console.error(error));
+        }
+    </script>
+</body>
+</html>

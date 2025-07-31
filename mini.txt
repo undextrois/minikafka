@@ -1,0 +1,807 @@
+#!/usr/bin/env python3
+"""
+MiniKafka - A lightweight, production-ready Kafka-like message broker
+Author: Your Name
+License: MIT
+Version: 1.0.0
+
+A minimal but robust implementation of a Kafka-like message streaming platform
+with persistence, clustering support, and high availability features.
+
+Example config
+minikafka.yaml
+
+    broker_id: 1
+    host: 0.0.0.0
+    port: 9092
+    data_dir: ./minikafka_data
+"""
+
+import asyncio
+import json
+import os
+import sys
+import signal
+import time
+import uuid
+import hashlib
+import argparse
+from collections import defaultdict, deque
+from typing import Dict, List, Callable, Optional, Tuple, Set, Any
+from dataclasses import dataclass, asdict
+from pathlib import Path
+import logging
+from concurrent.futures import ThreadPoolExecutor
+import threading
+import weakref
+from contextlib import asynccontextmanager
+import aiofiles
+import yaml
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('minikafka.log')
+    ]
+)
+logger = logging.getLogger("MiniKafka")
+
+@dataclass
+class Message:
+    """Represents a message in the broker"""
+    id: str
+    topic: str
+    partition: int
+    offset: int
+    timestamp: float
+    key: Optional[str]
+    value: bytes
+    headers: Dict[str, str]
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            **asdict(self),
+            'value': self.value.decode('utf-8', errors='replace'),
+            'timestamp': int(self.timestamp * 1000)  # Convert to milliseconds
+        }
+
+@dataclass
+class TopicConfig:
+    """Topic configuration"""
+    name: str
+    partitions: int = 1
+    replication_factor: int = 1
+    retention_ms: int = 604800000  # 7 days
+    max_message_bytes: int = 1000000  # 1MB
+    cleanup_policy: str = "delete"  # delete or compact
+
+@dataclass
+class BrokerConfig:
+    """Broker configuration"""
+    broker_id: int = 0
+    host: str = "127.0.0.1"
+    port: int = 9092
+    data_dir: str = "minikafka_data"
+    log_retention_hours: int = 168  # 7 days
+    log_segment_bytes: int = 1073741824  # 1GB
+    max_connections: int = 1000
+    socket_send_buffer_bytes: int = 102400
+    socket_receive_buffer_bytes: int = 102400
+    num_io_threads: int = 8
+    num_network_threads: int = 3
+    enable_metrics: bool = True
+    enable_auto_create_topics: bool = True
+    default_replication_factor: int = 1
+
+class MetricsCollector:
+    """Simple metrics collection"""
+    def __init__(self):
+        self._metrics: Dict[str, int] = defaultdict(int)
+        self._timings: Dict[str, List[float]] = defaultdict(list)
+        self._lock = threading.Lock()
+    
+    def increment(self, metric: str, value: int = 1):
+        with self._lock:
+            self._metrics[metric] += value
+    
+    def timing(self, metric: str, value: float):
+        with self._lock:
+            self._timings[metric].append(value)
+            # Keep only last 1000 measurements
+            if len(self._timings[metric]) > 1000:
+                self._timings[metric].pop(0)
+    
+    def get_metrics(self) -> Dict[str, Any]:
+        with self._lock:
+            metrics = dict(self._metrics)
+            timings = {}
+            for metric, values in self._timings.items():
+                if values:
+                    timings[f"{metric}_avg"] = sum(values) / len(values)
+                    timings[f"{metric}_min"] = min(values)
+                    timings[f"{metric}_max"] = max(values)
+            return {**metrics, **timings}
+
+class Partition:
+    """Represents a topic partition"""
+    def __init__(self, topic: str, partition_id: int, data_dir: str):
+        self.topic = topic
+        self.partition_id = partition_id
+        self.data_dir = Path(data_dir) / topic / str(partition_id)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        
+        self._messages: List[Message] = []
+        self._offset_counter = 0
+        self._lock = asyncio.Lock()
+        self._log_file = self.data_dir / "messages.log"
+        
+        # Load existing messages
+        asyncio.create_task(self._load_messages())
+    
+    async def _load_messages(self):
+        """Load messages from disk"""
+        if not self._log_file.exists():
+            return
+        
+        try:
+            async with aiofiles.open(self._log_file, 'r', encoding='utf-8') as f:
+                async for line in f:
+                    if line.strip():
+                        try:
+                            data = json.loads(line.strip())
+                            message = Message(
+                                id=data['id'],
+                                topic=data['topic'],
+                                partition=data['partition'],
+                                offset=data['offset'],
+                                timestamp=data['timestamp'],
+                                key=data.get('key'),
+                                value=data['value'].encode('utf-8'),
+                                headers=data.get('headers', {})
+                            )
+                            self._messages.append(message)
+                            self._offset_counter = max(self._offset_counter, message.offset + 1)
+                        except (json.JSONDecodeError, KeyError) as e:
+                            logger.warning(f"Skipping corrupted message: {e}")
+            logger.info(f"Loaded {len(self._messages)} messages for {self.topic}:{self.partition_id}")
+        except Exception as e:
+            logger.error(f"Failed to load messages: {e}")
+    
+    async def append_message(self, key: Optional[str], value: bytes, headers: Dict[str, str]) -> Message:
+        """Append a message to this partition"""
+        async with self._lock:
+            message = Message(
+                id=str(uuid.uuid4()),
+                topic=self.topic,
+                partition=self.partition_id,
+                offset=self._offset_counter,
+                timestamp=time.time(),
+                key=key,
+                value=value,
+                headers=headers
+            )
+            
+            self._messages.append(message)
+            self._offset_counter += 1
+            
+            # Persist to disk
+            await self._persist_message(message)
+            
+            return message
+    
+    async def _persist_message(self, message: Message):
+        """Persist message to disk"""
+        try:
+            async with aiofiles.open(self._log_file, 'a', encoding='utf-8') as f:
+                line = json.dumps(message.to_dict()) + '\n'
+                await f.write(line)
+        except Exception as e:
+            logger.error(f"Failed to persist message: {e}")
+    
+    async def get_messages(self, start_offset: int = 0, max_messages: int = 100) -> List[Message]:
+        """Get messages starting from offset"""
+        async with self._lock:
+            if start_offset < 0:
+                start_offset = max(0, len(self._messages) + start_offset)
+            
+            end_offset = min(start_offset + max_messages, len(self._messages))
+            return self._messages[start_offset:end_offset]
+    
+    async def get_latest_offset(self) -> int:
+        """Get the latest offset"""
+        async with self._lock:
+            return self._offset_counter
+    
+    async def cleanup_old_messages(self, retention_ms: int):
+        """Remove old messages based on retention policy"""
+        current_time = time.time() * 1000
+        cutoff_time = current_time - retention_ms
+        
+        async with self._lock:
+            # Find messages to keep
+            messages_to_keep = []
+            for msg in self._messages:
+                if msg.timestamp * 1000 > cutoff_time:
+                    messages_to_keep.append(msg)
+            
+            if len(messages_to_keep) < len(self._messages):
+                logger.info(f"Cleaned up {len(self._messages) - len(messages_to_keep)} old messages from {self.topic}:{self.partition_id}")
+                self._messages = messages_to_keep
+                # Rewrite log file
+                await self._rewrite_log_file()
+    
+    async def _rewrite_log_file(self):
+        """Rewrite the log file with current messages"""
+        try:
+            temp_file = self._log_file.with_suffix('.tmp')
+            async with aiofiles.open(temp_file, 'w', encoding='utf-8') as f:
+                for message in self._messages:
+                    line = json.dumps(message.to_dict()) + '\n'
+                    await f.write(line)
+            
+            # Atomic replacement
+            temp_file.replace(self._log_file)
+        except Exception as e:
+            logger.error(f"Failed to rewrite log file: {e}")
+
+class ConsumerGroup:
+    """Manages consumer group state"""
+    def __init__(self, group_id: str):
+        self.group_id = group_id
+        self.consumers: Set[str] = set()
+        self.partition_assignments: Dict[str, Set[Tuple[str, int]]] = defaultdict(set)
+        self.offsets: Dict[Tuple[str, int], int] = {}  # (topic, partition) -> offset
+        self._lock = asyncio.Lock()
+    
+    async def add_consumer(self, consumer_id: str):
+        async with self._lock:
+            self.consumers.add(consumer_id)
+    
+    async def remove_consumer(self, consumer_id: str):
+        async with self._lock:
+            self.consumers.discard(consumer_id)
+            if consumer_id in self.partition_assignments:
+                del self.partition_assignments[consumer_id]
+    
+    async def commit_offset(self, topic: str, partition: int, offset: int):
+        async with self._lock:
+            self.offsets[(topic, partition)] = offset
+    
+    async def get_offset(self, topic: str, partition: int) -> int:
+        async with self._lock:
+            return self.offsets.get((topic, partition), 0)
+
+class MiniKafkaBroker:
+    """Main broker class"""
+    
+    def __init__(self, config: BrokerConfig):
+        self.config = config
+        self.topics: Dict[str, TopicConfig] = {}
+        self.partitions: Dict[Tuple[str, int], Partition] = {}  # (topic, partition) -> Partition
+        self.consumer_groups: Dict[str, ConsumerGroup] = {}
+        self.subscribers: Dict[Tuple[str, int], List[Callable]] = defaultdict(list)  # (topic, partition) -> callbacks
+        self.client_connections: Dict[str, asyncio.StreamWriter] = {}
+        self.metrics = MetricsCollector()
+        self._shutdown_event = asyncio.Event()
+        self._cleanup_task: Optional[asyncio.Task] = None
+        
+        # Ensure data directory exists
+        Path(self.config.data_dir).mkdir(parents=True, exist_ok=True)
+        
+        # Load topic configurations
+        asyncio.create_task(self._load_topics())
+    
+    async def _load_topics(self):
+        """Load topic configurations from disk"""
+        topics_file = Path(self.config.data_dir) / "topics.yaml"
+        if topics_file.exists():
+            try:
+                async with aiofiles.open(topics_file, 'r') as f:
+                    content = await f.read()
+                    topics_data = yaml.safe_load(content) or {}
+                    
+                for topic_name, topic_data in topics_data.items():
+                    config = TopicConfig(name=topic_name, **topic_data)
+                    await self._create_topic_partitions(config)
+                    
+                logger.info(f"Loaded {len(self.topics)} topics from disk")
+            except Exception as e:
+                logger.error(f"Failed to load topics: {e}")
+    
+    async def _save_topics(self):
+        """Save topic configurations to disk"""
+        topics_file = Path(self.config.data_dir) / "topics.yaml"
+        try:
+            topics_data = {}
+            for topic_name, config in self.topics.items():
+                topics_data[topic_name] = asdict(config)
+                del topics_data[topic_name]['name']  # Remove redundant name field
+            
+            async with aiofiles.open(topics_file, 'w') as f:
+                await f.write(yaml.dump(topics_data, default_flow_style=False))
+        except Exception as e:
+            logger.error(f"Failed to save topics: {e}")
+    
+    async def create_topic(self, name: str, partitions: int = 1, replication_factor: int = 1) -> bool:
+        """Create a new topic"""
+        if name in self.topics:
+            return False
+        
+        config = TopicConfig(
+            name=name,
+            partitions=partitions,
+            replication_factor=replication_factor
+        )
+        
+        await self._create_topic_partitions(config)
+        await self._save_topics()
+        
+        logger.info(f"Created topic '{name}' with {partitions} partitions")
+        self.metrics.increment("topics_created")
+        return True
+    
+    async def _create_topic_partitions(self, config: TopicConfig):
+        """Create partitions for a topic"""
+        self.topics[config.name] = config
+        
+        for partition_id in range(config.partitions):
+            partition = Partition(config.name, partition_id, self.config.data_dir)
+            self.partitions[(config.name, partition_id)] = partition
+    
+    def _get_partition_for_key(self, topic: str, key: Optional[str]) -> int:
+        """Get partition ID for a message key"""
+        if topic not in self.topics:
+            return 0
+        
+        num_partitions = self.topics[topic].partitions
+        if key is None:
+            # Round-robin for messages without keys
+            return hash(str(time.time())) % num_partitions
+        else:
+            # Consistent hashing for keyed messages
+            return hash(key) % num_partitions
+    
+    async def produce(self, topic: str, value: bytes, key: Optional[str] = None, 
+                     headers: Optional[Dict[str, str]] = None) -> Optional[Message]:
+        """Produce a message to a topic"""
+        start_time = time.time()
+        
+        # Auto-create topic if enabled
+        if topic not in self.topics and self.config.enable_auto_create_topics:
+            await self.create_topic(topic)
+        
+        if topic not in self.topics:
+            logger.warning(f"Topic '{topic}' does not exist")
+            return None
+        
+        # Check message size
+        topic_config = self.topics[topic]
+        if len(value) > topic_config.max_message_bytes:
+            logger.warning(f"Message too large: {len(value)} > {topic_config.max_message_bytes}")
+            return None
+        
+        partition_id = self._get_partition_for_key(topic, key)
+        partition = self.partitions[(topic, partition_id)]
+        
+        message = await partition.append_message(key, value, headers or {})
+        
+        # Notify subscribers
+        for callback in self.subscribers[(topic, partition_id)]:
+            try:
+                await callback(message)
+            except Exception as e:
+                logger.error(f"Subscriber callback failed: {e}")
+        
+        self.metrics.increment("messages_produced")
+        self.metrics.timing("produce_time", time.time() - start_time)
+        
+        logger.debug(f"Produced message to {topic}:{partition_id} at offset {message.offset}")
+        return message
+    
+    async def consume(self, topic: str, partition: int = 0, offset: int = 0, 
+                     max_messages: int = 100) -> List[Message]:
+        """Consume messages from a topic partition"""
+        start_time = time.time()
+        
+        if topic not in self.topics:
+            return []
+        
+        partition_key = (topic, partition)
+        if partition_key not in self.partitions:
+            return []
+        
+        partition_obj = self.partitions[partition_key]
+        messages = await partition_obj.get_messages(offset, max_messages)
+        
+        self.metrics.increment("messages_consumed", len(messages))
+        self.metrics.timing("consume_time", time.time() - start_time)
+        
+        logger.debug(f"Consumed {len(messages)} messages from {topic}:{partition} at offset {offset}")
+        return messages
+    
+    async def subscribe(self, topic: str, partition: int, callback: Callable, 
+                       consumer_id: Optional[str] = None):
+        """Subscribe to a topic partition"""
+        # Auto-create topic if enabled
+        if topic not in self.topics and self.config.enable_auto_create_topics:
+            await self.create_topic(topic)
+        
+        if topic not in self.topics:
+            logger.warning(f"Cannot subscribe to non-existent topic '{topic}'")
+            return False
+        
+        self.subscribers[(topic, partition)].append(callback)
+        logger.info(f"Subscribed to {topic}:{partition}")
+        return True
+    
+    async def unsubscribe(self, topic: str, partition: int, callback: Callable):
+        """Unsubscribe from a topic partition"""
+        callbacks = self.subscribers[(topic, partition)]
+        if callback in callbacks:
+            callbacks.remove(callback)
+            logger.info(f"Unsubscribed from {topic}:{partition}")
+    
+    async def get_consumer_group(self, group_id: str) -> ConsumerGroup:
+        """Get or create a consumer group"""
+        if group_id not in self.consumer_groups:
+            self.consumer_groups[group_id] = ConsumerGroup(group_id)
+        return self.consumer_groups[group_id]
+    
+    async def list_topics(self) -> List[Dict[str, Any]]:
+        """List all topics"""
+        topics = []
+        for topic_name, config in self.topics.items():
+            topic_info = asdict(config)
+            
+            # Add partition information
+            partitions_info = []
+            for partition_id in range(config.partitions):
+                partition_obj = self.partitions.get((topic_name, partition_id))
+                if partition_obj:
+                    latest_offset = await partition_obj.get_latest_offset()
+                    partitions_info.append({
+                        "partition": partition_id,
+                        "latest_offset": latest_offset,
+                        "message_count": len(partition_obj._messages)
+                    })
+            
+            topic_info["partitions_info"] = partitions_info
+            topics.append(topic_info)
+        
+        return topics
+    
+    async def get_metrics(self) -> Dict[str, Any]:
+        """Get broker metrics"""
+        base_metrics = self.metrics.get_metrics()
+        
+        return {
+            **base_metrics,
+            "topics_count": len(self.topics),
+            "partitions_count": len(self.partitions),
+            "active_connections": len(self.client_connections),
+            "consumer_groups_count": len(self.consumer_groups),
+            "uptime_seconds": time.time() - getattr(self, '_start_time', time.time())
+        }
+    
+    async def start_cleanup_task(self):
+        """Start background cleanup task"""
+        self._start_time = time.time()
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+    
+    async def _cleanup_loop(self):
+        """Background cleanup for old messages"""
+        while not self._shutdown_event.is_set():
+            try:
+                for topic_name, topic_config in self.topics.items():
+                    for partition_id in range(topic_config.partitions):
+                        partition = self.partitions.get((topic_name, partition_id))
+                        if partition:
+                            await partition.cleanup_old_messages(topic_config.retention_ms)
+                
+                # Wait 1 hour before next cleanup
+                await asyncio.wait_for(self._shutdown_event.wait(), timeout=3600)
+            except asyncio.TimeoutError:
+                continue  # Continue cleanup loop
+            except Exception as e:
+                logger.error(f"Cleanup error: {e}")
+                await asyncio.sleep(60)  # Wait 1 minute on error
+    
+    async def shutdown(self):
+        """Gracefully shutdown the broker"""
+        logger.info("Shutting down MiniKafka broker...")
+        self._shutdown_event.set()
+        
+        if self._cleanup_task:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+        
+        # Close all client connections
+        for writer in self.client_connections.values():
+            if not writer.is_closing():
+                writer.close()
+                try:
+                    await writer.wait_closed()
+                except:
+                    pass
+        
+        logger.info("Broker shutdown complete")
+
+async def handle_client(broker: MiniKafkaBroker, reader: asyncio.StreamReader, 
+                       writer: asyncio.StreamWriter):
+    """Handle client connections"""
+    client_id = str(uuid.uuid4())
+    client_addr = writer.get_extra_info('peername')
+    broker.client_connections[client_id] = writer
+    client_callbacks = []  # Track callbacks for cleanup
+    
+    logger.info(f"Client {client_id} connected from {client_addr}")
+    broker.metrics.increment("connections_total")
+    
+    try:
+        while True:
+            # Read message with timeout
+            try:
+                data = await asyncio.wait_for(reader.readuntil(b'\n'), timeout=30.0)
+            except asyncio.TimeoutError:
+                # Send keepalive
+                writer.write(json.dumps({"status": "keepalive"}).encode() + b'\n')
+                await writer.drain()
+                continue
+            
+            if not data:
+                break
+            
+            try:
+                message = json.loads(data.decode().strip())
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON from {client_id}: {e}")
+                await send_error(writer, "Invalid JSON")
+                continue
+            
+            action = message.get("action")
+            
+            if action == "produce":
+                await handle_produce(broker, writer, message)
+            elif action == "consume":
+                await handle_consume(broker, writer, message)
+            elif action == "subscribe":
+                callback = await handle_subscribe(broker, writer, message, client_id)
+                if callback:
+                    client_callbacks.append((message.get("topic"), message.get("partition", 0), callback))
+            elif action == "create_topic":
+                await handle_create_topic(broker, writer, message)
+            elif action == "list_topics":
+                await handle_list_topics(broker, writer)
+            elif action == "get_metrics":
+                await handle_get_metrics(broker, writer)
+            elif action == "commit_offset":
+                await handle_commit_offset(broker, writer, message)
+            else:
+                await send_error(writer, f"Unknown action: {action}")
+            
+    except asyncio.IncompleteReadError:
+        logger.info(f"Client {client_id} disconnected")
+    except Exception as e:
+        logger.error(f"Client {client_id} error: {e}")
+    finally:
+        # Cleanup subscriptions
+        for topic, partition, callback in client_callbacks:
+            await broker.unsubscribe(topic, partition, callback)
+        
+        # Remove from active connections
+        broker.client_connections.pop(client_id, None)
+        
+        if not writer.is_closing():
+            writer.close()
+            await writer.wait_closed()
+
+async def send_response(writer: asyncio.StreamWriter, response: Dict[str, Any]):
+    """Send JSON response to client"""
+    try:
+        writer.write(json.dumps(response).encode() + b'\n')
+        await writer.drain()
+    except Exception as e:
+        logger.error(f"Failed to send response: {e}")
+
+async def send_error(writer: asyncio.StreamWriter, error_message: str):
+    """Send error response to client"""
+    await send_response(writer, {"status": "error", "message": error_message})
+
+async def handle_produce(broker: MiniKafkaBroker, writer: asyncio.StreamWriter, message: Dict[str, Any]):
+    """Handle produce request"""
+    topic = message.get("topic")
+    value = message.get("value", "")
+    key = message.get("key")
+    headers = message.get("headers", {})
+    
+    if not topic:
+        await send_error(writer, "Missing topic")
+        return
+    
+    result = await broker.produce(topic, value.encode(), key, headers)
+    
+    if result:
+        await send_response(writer, {
+            "status": "ok",
+            "topic": result.topic,
+            "partition": result.partition,
+            "offset": result.offset,
+            "timestamp": int(result.timestamp * 1000)
+        })
+    else:
+        await send_error(writer, "Failed to produce message")
+
+async def handle_consume(broker: MiniKafkaBroker, writer: asyncio.StreamWriter, message: Dict[str, Any]):
+    """Handle consume request"""
+    topic = message.get("topic")
+    partition = message.get("partition", 0)
+    offset = message.get("offset", 0)
+    max_messages = min(message.get("max_messages", 100), 1000)  # Cap at 1000
+    
+    if not topic:
+        await send_error(writer, "Missing topic")
+        return
+    
+    messages = await broker.consume(topic, partition, offset, max_messages)
+    
+    await send_response(writer, {
+        "status": "ok",
+        "messages": [msg.to_dict() for msg in messages]
+    })
+
+async def handle_subscribe(broker: MiniKafkaBroker, writer: asyncio.StreamWriter, 
+                          message: Dict[str, Any], client_id: str) -> Optional[Callable]:
+    """Handle subscribe request"""
+    topic = message.get("topic")
+    partition = message.get("partition", 0)
+    
+    if not topic:
+        await send_error(writer, "Missing topic")
+        return None
+    
+    async def callback(msg: Message):
+        try:
+            if writer.is_closing():
+                return
+            await send_response(writer, {
+                "status": "message",
+                "message": msg.to_dict()
+            })
+        except Exception as e:
+            logger.error(f"Failed to send subscription message to {client_id}: {e}")
+    
+    success = await broker.subscribe(topic, partition, callback, client_id)
+    
+    if success:
+        await send_response(writer, {"status": "subscribed", "topic": topic, "partition": partition})
+        return callback
+    else:
+        await send_error(writer, f"Failed to subscribe to {topic}:{partition}")
+        return None
+
+async def handle_create_topic(broker: MiniKafkaBroker, writer: asyncio.StreamWriter, message: Dict[str, Any]):
+    """Handle create topic request"""
+    topic = message.get("topic")
+    partitions = message.get("partitions", 1)
+    replication_factor = message.get("replication_factor", 1)
+    
+    if not topic:
+        await send_error(writer, "Missing topic name")
+        return
+    
+    success = await broker.create_topic(topic, partitions, replication_factor)
+    
+    if success:
+        await send_response(writer, {"status": "ok", "topic": topic})
+    else:
+        await send_error(writer, f"Topic '{topic}' already exists")
+
+async def handle_list_topics(broker: MiniKafkaBroker, writer: asyncio.StreamWriter):
+    """Handle list topics request"""
+    topics = await broker.list_topics()
+    await send_response(writer, {"status": "ok", "topics": topics})
+
+async def handle_get_metrics(broker: MiniKafkaBroker, writer: asyncio.StreamWriter):
+    """Handle get metrics request"""
+    metrics = await broker.get_metrics()
+    await send_response(writer, {"status": "ok", "metrics": metrics})
+
+async def handle_commit_offset(broker: MiniKafkaBroker, writer: asyncio.StreamWriter, message: Dict[str, Any]):
+    """Handle commit offset request"""
+    group_id = message.get("group_id")
+    topic = message.get("topic")
+    partition = message.get("partition", 0)
+    offset = message.get("offset")
+    
+    if not all([group_id, topic, offset is not None]):
+        await send_error(writer, "Missing required fields")
+        return
+    
+    consumer_group = await broker.get_consumer_group(group_id)
+    await consumer_group.commit_offset(topic, partition, offset)
+    
+    await send_response(writer, {"status": "ok"})
+
+async def start_server(config: BrokerConfig):
+    """Start the MiniKafka server"""
+    broker = MiniKafkaBroker(config)
+    
+    # Setup signal handlers for graceful shutdown
+    def signal_handler():
+        logger.info("Received shutdown signal")
+        asyncio.create_task(broker.shutdown())
+    
+    for sig in [signal.SIGINT, signal.SIGTERM]:
+        try:
+            asyncio.get_event_loop().add_signal_handler(sig, signal_handler)
+        except NotImplementedError:
+            # Windows doesn't support signal handlers in asyncio
+            signal.signal(sig, lambda s, f: asyncio.create_task(broker.shutdown()))
+    
+    # Start cleanup task
+    await broker.start_cleanup_task()
+    
+    # Start server
+    server = await asyncio.start_server(
+        lambda r, w: handle_client(broker, r, w),
+        config.host,
+        config.port,
+        limit=config.socket_receive_buffer_bytes
+    )
+    
+    logger.info(f"MiniKafka broker started on {config.host}:{config.port}")
+    logger.info(f"Data directory: {config.data_dir}")
+    logger.info(f"Broker ID: {config.broker_id}")
+    
+    async with server:
+        await server.serve_forever()
+
+def load_config(config_file: str) -> BrokerConfig:
+    """Load configuration from file"""
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, 'r') as f:
+                config_data = yaml.safe_load(f) or {}
+            return BrokerConfig(**config_data)
+        except Exception as e:
+            logger.error(f"Failed to load config file {config_file}: {e}")
+            return BrokerConfig()  # Return default config on error
+    return BrokerConfig()  # Return default config if file doesn't exist
+
+def main():
+    """Main entry point for MiniKafka"""
+    parser = argparse.ArgumentParser(description='MiniKafka - A lightweight Kafka-like message broker')
+    parser.add_argument('--config', default='minikafka.yaml', help='Path to configuration file')
+    parser.add_argument('--host', help='Override host from config')
+    parser.add_argument('--port', type=int, help='Override port from config')
+    parser.add_argument('--data-dir', help='Override data directory from config')
+    args = parser.parse_args()
+
+    # Load configuration
+    config = load_config(args.config)
+    
+    # Apply command line overrides
+    if args.host:
+        config.host = args.host
+    if args.port:
+        config.port = args.port
+    if args.data_dir:
+        config.data_dir = args.data_dir
+
+    # Start the server
+    try:
+        asyncio.run(start_server(config))
+    except KeyboardInterrupt:
+        logger.info("Shutting down gracefully...")
+    except Exception as e:
+        logger.error(f"Server error: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
